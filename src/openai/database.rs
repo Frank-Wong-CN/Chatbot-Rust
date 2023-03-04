@@ -13,6 +13,7 @@ fn create_schema_conversation(conn: &Connection) -> Result<usize> {
 		CREATE TABLE IF NOT EXISTS conversation (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			title VARCHAR(512),
+			key VARCHAR(512),
 			updateat DATETIME DEFAULT CURRENT_TIMESTAMP
 		);
 	";
@@ -42,15 +43,15 @@ pub fn init_schemas(conn: &Connection) -> Result<usize> {
     Ok(0)
 }
 
-pub fn add_conversation(conn: &Connection, title: &str) -> Result<u32> {
+pub fn add_conversation(conn: &Connection, title: &str, key: &str) -> Result<u32> {
     let sql = "
-		INSERT INTO conversation (title) VALUES (?);
+		INSERT INTO conversation (title, key) VALUES (?, ?);
 	";
-    conn.execute(sql, [title])?;
+    conn.execute(sql, [title, key])?;
     return conn.query_row("SELECT last_insert_rowid();", [], |row| row.get(0));
 }
 
-pub fn get_all_conversations(conn: &Connection) -> Result<Vec<ConversationListing>> {
+pub fn get_all_conversations(conn: &Connection, key: &str) -> Result<Vec<ConversationListing>> {
     let sql = "
 		SELECT
 			a.id AS ID,
@@ -59,13 +60,14 @@ pub fn get_all_conversations(conn: &Connection) -> Result<Vec<ConversationListin
 			IFNULL(MAX(b.updateat), a.updateat) AS LastUpdate
 		FROM conversation a
 		LEFT JOIN message b ON a.id = b.conversation_id
+		WHERE a.key = ?
 		GROUP BY a.id
 		ORDER BY MAX(b.updateat) ASC;
 	";
     let mut stmt = conn.prepare(sql).unwrap();
 
     let conv: Vec<ConversationListing> = stmt
-        .query_map([], |row| {
+        .query_map([key], |row| {
             Ok(ConversationListing {
                 id: row.get(0)?,
                 title: row.get(1)?,

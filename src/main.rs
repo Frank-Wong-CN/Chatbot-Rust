@@ -54,11 +54,11 @@ async fn main() -> Result<(), MainError> {
 	let max_conversation_token = 3000;
 	init_schemas(&conn)?;
 
-	let seperator = String::from("===========================================================================");
+	let separator = String::from("===========================================================================");
     
     println!("Welcome to OpenAI Playground. Press Ctrl+C to exit the program.");
 
-	let all_conversations = get_all_conversations(&conn)?;
+	let all_conversations = get_all_conversations(&conn, &api_key)?;
 	println!("You have {} conversation(s) currently saved.", all_conversations.len());
 	for conv in all_conversations.iter() {
 		println!("[{}] {}: {} (Usage: {} tokens in total)", conv.lastupdate.format("%Y-%m-%d %H:%M:%S"), conv.id, conv.title, conv.usage);
@@ -81,11 +81,11 @@ async fn main() -> Result<(), MainError> {
 			all_messages = get_all_messages_in_conversation(&conn, conversation_id)?;
 		}
 		else {
-			conversation_id = add_conversation(&conn, &prompt)?;
+			conversation_id = add_conversation(&conn, &prompt, &api_key)?;
 		}
 
 		for msg in all_messages.iter() {
-			println!("{}\n{}: {}", seperator,
+			println!("{}\n{}: {}", separator,
 				match &msg.role[..] {
 					"assistant" => "ChatGPT",
 					"user" => "You",
@@ -97,7 +97,7 @@ async fn main() -> Result<(), MainError> {
 		break;
 	}
 
-	println!("{}", seperator);
+	println!("{}", separator);
 
     loop {
         print!("You: ");
@@ -145,16 +145,16 @@ async fn main() -> Result<(), MainError> {
 			Ok(response) => {
 				add_server_message(&conn, conversation_id, &response);
 				all_messages = get_all_messages_in_conversation(&conn, conversation_id)?;
-				spinner.stop_with_message(seperator.clone());
+				spinner.stop_with_message(separator.clone());
 
 				println!("ChatGPT: {}", response.msg().trim());
-				println!("{}", seperator)
+				println!("{}", separator)
 			},
 			Err(err) => {
-				spinner.stop_with_message(seperator.clone());
+				spinner.stop_with_message(separator.clone());
 
 				println!("Error: {}", err.to_string());
-				println!("{}", seperator)
+				println!("{}", separator)
 			}
 		}
     }
