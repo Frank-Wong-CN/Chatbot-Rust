@@ -19,7 +19,7 @@ struct CommandLineParser {
     key: Option<String>,
 
     /// Read API Key from file
-    #[arg(short = 'f', long, value_name = "API KEY FILE")]
+    #[arg(short = 'f', long, value_name = "API KEY FILE", default_value = "api_key")]
     key_file: Option<String>,
 
 	// Conversation database
@@ -32,12 +32,16 @@ async fn main() -> Result<(), MainError> {
     let args = CommandLineParser::parse();
 
     let mut api_key = "".into();
-    if let Some(key_file) = args.key_file {
-        api_key = std::fs::read_to_string(key_file)?;
-    }
+	
     if let Some(key) = args.key {
         api_key = key;
     }
+    else if let Some(key_file) = args.key_file {
+        if let Ok(str) = std::fs::read_to_string(key_file) {
+			api_key = str;
+		}
+    }
+
     if api_key.is_empty() {
         println!("Please provide an API. See -h for more details.");
         return Ok(())
