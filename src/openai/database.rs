@@ -1,10 +1,10 @@
 use chrono::{DateTime, TimeZone, Utc};
 use rusqlite::{Connection, Result};
-use std::str::FromStr;
+use std::{str::FromStr, path::PathBuf};
 
 use super::types::*;
 
-pub fn open_connection(db: String) -> Connection {
+pub fn open_connection(db: &PathBuf) -> Connection {
     return Connection::open(db).unwrap();
 }
 

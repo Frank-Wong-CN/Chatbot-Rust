@@ -1,6 +1,6 @@
 #![allow(unused)]
 use clap::Parser;
-use std::io::Write;
+use std::{io::Write, path::PathBuf};
 use spinners::{Spinner, Spinners};
 
 mod error;
@@ -38,6 +38,7 @@ struct CommandLineParser {
 #[tokio::main]
 async fn main() -> Result<(), MainError> {
     let args = CommandLineParser::parse();
+	let exe_dir = std::env::current_exe().unwrap().parent().unwrap().to_path_buf();
 
     let mut api_key = "".into();
 	
@@ -45,7 +46,9 @@ async fn main() -> Result<(), MainError> {
         api_key = key;
     }
     else if let Some(key_file) = args.key_file {
-        if let Ok(str) = std::fs::read_to_string(key_file) {
+		let mut api_dir = exe_dir.clone();
+		api_dir.push(key_file);
+        if let Ok(str) = std::fs::read_to_string(&api_dir) {
 			api_key = str;
 		}
     }
@@ -55,7 +58,9 @@ async fn main() -> Result<(), MainError> {
         return Ok(())
     }
 
-	let conn = open_connection(args.database);
+	let mut db_dir = exe_dir.clone();
+	db_dir.push(args.database);
+	let conn = open_connection(&db_dir);
 	let mut conversation_id: u32 = 0;
 	let mut all_messages: Vec<SavedMessage> = vec![];
 	let max_conversation_size = args.max_conversation;
