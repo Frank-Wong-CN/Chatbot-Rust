@@ -80,7 +80,7 @@ pub fn get_all_conversations(conn: &Connection, key: &str) -> Result<Vec<Convers
 		LEFT JOIN message b ON a.id = b.conversation_id
 		WHERE a.key = ?
 		GROUP BY a.id
-		ORDER BY MAX(b.updateat) ASC;
+		ORDER BY LastUpdate ASC;
 	";
     let mut stmt = conn.prepare(sql).unwrap();
 

@@ -1,6 +1,6 @@
 use clap::Parser;
 use serde_json::json;
-use std::io::Write;
+use std::{io::Write, path::PathBuf};
 use spinners::{Spinner, Spinners};
 
 mod error;
@@ -19,11 +19,11 @@ struct CommandLineParser {
     key: Option<String>,
 
     /// Read API Key from file
-    #[arg(short = 'f', long, value_name = "API Key File", default_value = "api_key")]
-    key_file: Option<String>,
+    #[arg(short = 'f', long, value_name = "API Key File", default_value = "$api_key")]
+    key_file: String,
 
 	// Conversation database
-	#[arg(short = 'd', long, value_name = "Database", default_value = "ai.db", required = false)]
+	#[arg(short = 'd', long, value_name = "Database", default_value = "$ai.db", required = false)]
 	database: String,
 
 	// Max token
@@ -39,16 +39,25 @@ struct CommandLineParser {
 async fn main() -> Result<(), MainError> {
     let args = CommandLineParser::parse();
 	let exe_dir = std::env::current_exe().unwrap().parent().unwrap().to_path_buf();
+	let cw_dir = std::env::current_dir().unwrap().to_path_buf();
 
-    let mut api_key = "".into();
+    let mut api_key = String::new();
 	
     if let Some(key) = args.key {
         api_key = key;
     }
-    else if let Some(key_file) = args.key_file {
-		let mut api_dir = exe_dir.clone();
-		api_dir.push(key_file);
-        if let Ok(str) = std::fs::read_to_string(&api_dir) {
+    else {
+		let mut api_dir: PathBuf;
+		if args.key_file.starts_with("$") {
+			api_dir = exe_dir.clone();
+			api_dir.push(&args.key_file[1..]);
+		}
+		else {
+			api_dir = cw_dir.clone();
+			api_dir.push(args.key_file);
+		}
+
+		if let Ok(str) = std::fs::read_to_string(&api_dir) {
 			api_key = str;
 		}
     }
@@ -58,8 +67,16 @@ async fn main() -> Result<(), MainError> {
         return Ok(())
     }
 
-	let mut db_dir = exe_dir.clone();
-	db_dir.push(args.database);
+	let mut db_dir: PathBuf;
+	if args.database.starts_with("$") {
+		db_dir = exe_dir.clone();
+		db_dir.push(&args.database[1..]);
+	}
+	else {
+		db_dir = cw_dir.clone();
+		db_dir.push(args.database);
+	}
+
 	let conn = open_connection(&db_dir);
 	let conversation_id: u32;
 	let mut all_conv_id: Vec<u32> = vec![];
