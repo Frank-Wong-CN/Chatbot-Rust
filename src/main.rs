@@ -62,6 +62,7 @@ async fn main() -> Result<(), MainError> {
 	db_dir.push(args.database);
 	let conn = open_connection(&db_dir);
 	let conversation_id: u32;
+	let mut all_conv_id: Vec<u32> = vec![];
 	let mut all_messages: Vec<SavedMessage> = vec![];
 	let max_conversation_size = args.max_conversation;
 	let max_conversation_token = args.max_token;
@@ -74,6 +75,7 @@ async fn main() -> Result<(), MainError> {
 	let all_conversations = get_all_conversations(&conn, &api_key)?;
 	println!("You have {} conversation(s) currently saved.", all_conversations.len());
 	for conv in all_conversations.iter() {
+		all_conv_id.push(conv.id);
 		println!("[{}] {}: {} (Usage: {} tokens in total)", conv.lastupdate.format("%Y-%m-%d %H:%M:%S"), conv.id, conv.title, conv.usage);
 	}
 
@@ -90,6 +92,10 @@ async fn main() -> Result<(), MainError> {
 
 		let is_number = str::parse::<u32>(&prompt);
 		if let Ok(number) = is_number {
+			if !all_conv_id.contains(&number) {
+				println!("No such conversation. Please enter again: ");
+				continue
+			}
 			conversation_id = number;
 			all_messages = get_all_messages_in_conversation(&conn, conversation_id)?;
 		}
