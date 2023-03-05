@@ -23,7 +23,7 @@ struct CommandLineParser {
     key_file: String,
 
 	// Conversation database
-	#[arg(short = 'd', long, value_name = "Database", default_value = "$ai.db", required = false)]
+	#[arg(short = 'd', long, value_name = "Database", default_value = "$ai.db")]
 	database: String,
 
 	// Max token
@@ -33,6 +33,10 @@ struct CommandLineParser {
 	// Max remembered conversation
 	#[arg(long, value_name = "Remembered Conversation", default_value = "32")]
 	max_conversation: u32,
+
+	// Proxy
+	#[arg(short, long, value_name = "Proxy Address, for example: \"socks5://127.0.0.1:1080\"")]
+	proxy: Option<String>,
 }
 
 #[tokio::main]
@@ -175,7 +179,7 @@ async fn main() -> Result<(), MainError> {
 
 		context.push(Message { role: MessageRole::User, content: prompt.clone() });
 
-        let openai_response = get_response(&context, &api_key).await;
+        let openai_response = get_response(&context, &api_key, &args.proxy).await;
 		match openai_response {
 			Ok(response) => match response {
 				OpenAIResponse::Success(completion_response) => {
