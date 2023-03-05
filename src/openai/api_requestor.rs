@@ -25,7 +25,7 @@ pub async fn get_response(
     return match response {
         Ok(success) => Ok(success.json::<CompletionResponse>().await?),
         Err(failed) => Ok(CompletionResponse {
-            id: String::new(),
+            id: String::from("Request error"),
             object: String::new(),
             created: 0,
             model: String::new(),

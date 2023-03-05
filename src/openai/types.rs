@@ -38,6 +38,10 @@ impl CompletionResponse {
 	pub fn msg(&self) -> String {
 		return self.choices[0].message.content.clone();
 	}
+
+	pub fn error(&self) -> bool {
+		return self.id == "Request error"
+	}
 }
 
 #[derive(Deserialize)]

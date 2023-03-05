@@ -15,16 +15,24 @@ use openai::prelude::*;
 #[command(about = "A terminal-based client that calls ChatGPT API to generate answers.", long_about = None)]
 struct CommandLineParser {
     /// Supply API Key directly
-    #[arg(short, long, value_name = "API KEY")]
+    #[arg(short, long, value_name = "API Key")]
     key: Option<String>,
 
     /// Read API Key from file
-    #[arg(short = 'f', long, value_name = "API KEY FILE", default_value = "api_key")]
+    #[arg(short = 'f', long, value_name = "API Key File", default_value = "api_key")]
     key_file: Option<String>,
 
 	// Conversation database
-	#[arg(short = 'd', long, value_name = "DATABASE", default_value = "ai.db", required = false)]
-	database: String
+	#[arg(short = 'd', long, value_name = "Database", default_value = "ai.db", required = false)]
+	database: String,
+
+	// Max token
+	#[arg(long, value_name = "Size", default_value = "3800")]
+	max_token: usize,
+
+	// Max remembered conversation
+	#[arg(long, value_name = "Remembered Conversation", default_value = "32")]
+	max_conversation: u32,
 }
 
 #[tokio::main]
@@ -50,8 +58,8 @@ async fn main() -> Result<(), MainError> {
 	let conn = open_connection(args.database);
 	let mut conversation_id: u32 = 0;
 	let mut all_messages: Vec<SavedMessage> = vec![];
-	let max_conversation_size = 10;
-	let max_conversation_token = 3000;
+	let max_conversation_size = args.max_conversation;
+	let max_conversation_token = args.max_token;
 	init_schemas(&conn)?;
 
 	let separator = String::from("===========================================================================");
@@ -137,18 +145,26 @@ async fn main() -> Result<(), MainError> {
 			});
 		}
 
-		add_client_message(&conn, conversation_id, &prompt);
-		context.push(Message { role: MessageRole::User, content: prompt });
+		context.push(Message { role: MessageRole::User, content: prompt.clone() });
 
         let response = get_response(context, &api_key).await;
 		match response {
 			Ok(response) => {
-				add_server_message(&conn, conversation_id, &response);
-				all_messages = get_all_messages_in_conversation(&conn, conversation_id)?;
-				spinner.stop_with_message(separator.clone());
+				if !response.error() {
+					add_client_message(&conn, conversation_id, &prompt);
+					add_server_message(&conn, conversation_id, &response);
+					all_messages = get_all_messages_in_conversation(&conn, conversation_id)?;
+					spinner.stop_with_message(separator.clone());
 
-				println!("ChatGPT: {}", response.msg().trim());
-				println!("{}", separator)
+					println!("ChatGPT: {}", response.msg().trim());
+					println!("{}", separator)
+				}
+				else {
+					spinner.stop_with_message(separator.clone());
+
+					println!("Error: {}", response.msg().trim());
+					println!("{}", separator)
+				}
 			},
 			Err(err) => {
 				spinner.stop_with_message(separator.clone());
