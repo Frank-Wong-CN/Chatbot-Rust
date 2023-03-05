@@ -69,7 +69,7 @@ pub struct TokenUsage {
 #[derive(Serialize, Deserialize)]
 pub struct ResponseChoice {
 	pub index: u64,
-	pub finish_reason: String,
+	pub finish_reason: Option<String>,
     pub message: Message
 }
 

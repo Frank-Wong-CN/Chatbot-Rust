@@ -27,9 +27,9 @@ pub async fn get_response(
         Ok(success) => match success.text().await {
             Ok(body) => match serde_json::from_str::<CompletionResponse>(&body) {
 				Ok(completion) => Ok(OpenAIResponse::Success(completion)),
-				Err(_) => match serde_json::from_str::<OpenAIError>(&body) {
+				Err(json_error) => match serde_json::from_str::<OpenAIError>(&body) {
 					Ok(openai_response) => Ok(OpenAIResponse::Failure(openai_response)),
-					Err(json_error) => Err(JSONParseError::new(
+					Err(_) => Err(JSONParseError::new(
 						json_error.to_string(),
 						body,
 					)
