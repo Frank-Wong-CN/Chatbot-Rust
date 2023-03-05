@@ -1,6 +1,6 @@
-#![allow(unused)]
 use clap::Parser;
-use std::{io::Write, path::PathBuf};
+use serde_json::json;
+use std::io::Write;
 use spinners::{Spinner, Spinners};
 
 mod error;
@@ -61,7 +61,7 @@ async fn main() -> Result<(), MainError> {
 	let mut db_dir = exe_dir.clone();
 	db_dir.push(args.database);
 	let conn = open_connection(&db_dir);
-	let mut conversation_id: u32 = 0;
+	let conversation_id: u32;
 	let mut all_messages: Vec<SavedMessage> = vec![];
 	let max_conversation_size = args.max_conversation;
 	let max_conversation_token = args.max_token;
@@ -152,30 +152,32 @@ async fn main() -> Result<(), MainError> {
 
 		context.push(Message { role: MessageRole::User, content: prompt.clone() });
 
-        let response = get_response(context, &api_key).await;
-		match response {
-			Ok(response) => {
-				if !response.error() {
-					add_client_message(&conn, conversation_id, &prompt);
-					add_server_message(&conn, conversation_id, &response);
+        let openai_response = get_response(&context, &api_key).await;
+		match openai_response {
+			Ok(response) => match response {
+				OpenAIResponse::Success(completion_response) => {
+					add_client_message(&conn, conversation_id, &prompt)?;
+					add_server_message(&conn, conversation_id, &completion_response)?;
 					all_messages = get_all_messages_in_conversation(&conn, conversation_id)?;
 					spinner.stop_with_message(separator.clone());
-
-					println!("ChatGPT: {}", response.msg().trim());
-					println!("{}", separator)
-				}
-				else {
+	
+					println!("ChatGPT: {}", completion_response.msg().trim());
+					println!("{}", separator);
+				},
+				OpenAIResponse::Failure(openai_error) => {
+					add_error_log(&conn, &api_key, &context, &json!(openai_error).to_string(), Some(&openai_error))?;
 					spinner.stop_with_message(separator.clone());
 
-					println!("Error: {}", response.msg().trim());
-					println!("{}", separator)
+					println!("Error: {}", openai_error.error.message);
+					println!("{}", separator);
 				}
 			},
 			Err(err) => {
+				add_error_log(&conn, &api_key, &context, &err, None)?;
 				spinner.stop_with_message(separator.clone());
 
-				println!("Error: {}", err.to_string());
-				println!("{}", separator)
+				println!("Error: {}", err);
+				println!("{}", separator);
 			}
 		}
     }

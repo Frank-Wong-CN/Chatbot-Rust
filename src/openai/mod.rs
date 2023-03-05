@@ -3,3 +3,4 @@ pub mod types;
 pub mod prelude;
 
 mod database;
+mod error;

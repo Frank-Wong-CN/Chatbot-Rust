@@ -1,6 +1,6 @@
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{TimeZone, Utc};
 use rusqlite::{Connection, Result};
-use std::{str::FromStr, path::PathBuf};
+use std::path::PathBuf;
 
 use super::types::*;
 
@@ -8,12 +8,29 @@ pub fn open_connection(db: &PathBuf) -> Connection {
     return Connection::open(db).unwrap();
 }
 
+fn create_schema_error_log(conn: &Connection) -> Result<usize> {
+    let sql = "
+		CREATE TABLE IF NOT EXISTS error (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			key VARCHAR(512) NOT NULL,
+			context TEXT,
+			error TEXT,
+			message TEXT,
+			code VARCHAR(128),
+			type VARCHAR(128),
+			param TEXT,
+			updateat DATETIME DEFAULT CURRENT_TIMESTAMP
+		);
+	";
+    conn.execute(sql, [])
+}
+
 fn create_schema_conversation(conn: &Connection) -> Result<usize> {
     let sql = "
 		CREATE TABLE IF NOT EXISTS conversation (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			title VARCHAR(512),
-			key VARCHAR(512),
+			title VARCHAR(512) NOT NULL,
+			key VARCHAR(512) NOT NULL,
 			updateat DATETIME DEFAULT CURRENT_TIMESTAMP
 		);
 	";
@@ -24,11 +41,11 @@ fn create_schema_message(conn: &Connection) -> Result<usize> {
     let sql = "
 		CREATE TABLE IF NOT EXISTS message (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			conversation_id INTEGER,
-			role VARCHAR(32),
+			conversation_id INTEGER NOT NULL,
+			role VARCHAR(32) NOT NULL,
 			content TEXT,
-			prompt_tokens INTEGER,
-			completion_tokens INTEGER,
+			prompt_tokens INTEGER NOT NULL,
+			completion_tokens INTEGER NOT NULL,
 			updateat DATETIME DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (conversation_id) REFERENCES conversation (id)
 		);
@@ -37,6 +54,7 @@ fn create_schema_message(conn: &Connection) -> Result<usize> {
 }
 
 pub fn init_schemas(conn: &Connection) -> Result<usize> {
+	create_schema_error_log(conn)?;
     create_schema_conversation(conn)?;
     create_schema_message(conn)?;
 
@@ -112,7 +130,6 @@ pub fn get_all_messages_in_conversation(conn: &Connection, id: u32) -> Result<Ve
 }
 
 pub fn add_client_message(conn: &Connection, id: u32, msg: &str) -> Result<usize> {
-	let content = msg.clone().trim().replace("\"", "\\\"");
     let sql = format!("
 		INSERT INTO message (conversation_id, role, content, prompt_tokens, completion_tokens) VALUES (
 			{}, ?, ?, {}, {}
@@ -136,4 +153,32 @@ pub fn add_server_message(conn: &Connection, id: u32, msg: &CompletionResponse) 
 	", id, msg.usage.prompt_tokens, msg.usage.completion_tokens);
 	let mut stmt = conn.prepare(&sql)?;
     stmt.execute([role, &content])
+}
+
+pub fn add_error_log(
+	conn: &Connection,
+	key: &str,
+	context: &Vec<Message>,
+	error: &str,
+	openai_error: Option<&OpenAIError>
+) -> Result<usize> {
+	let sql = format!("
+		INSERT INTO error (key, context, error, message, type, code, param) VALUES (
+			?, ?, ?, ?, ?, ?, ?
+		);
+	");
+	let mut message: Option<&str> = None;
+	let mut code: Option<&str> = None;
+	let mut r#type: Option<&str> = None;
+	let mut param: Option<&str> = None;
+	if let Some(openai_error) = openai_error {
+		message = Some(&openai_error.error.message);
+		code = Some(&openai_error.error.code);
+		r#type = Some(&openai_error.error.r#type);
+		if let Some(has_params) = &openai_error.error.param {
+			param = Some(&has_params);
+		};
+	}
+	let mut stmt = conn.prepare(&sql)?;
+    stmt.execute([Some(key), Some(&serde_json::to_string(context).unwrap()), Some(error), message, code, r#type, param])
 }

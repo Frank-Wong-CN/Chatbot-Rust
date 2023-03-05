@@ -18,13 +18,32 @@ pub struct SavedMessage {
 	pub updateat: DateTime<Utc>
 }
 
+#[derive(Serialize, Deserialize)]
+pub enum OpenAIResponse {
+	Success(CompletionResponse),
+	Failure(OpenAIError)
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct OpenAIError {
+	pub error: CompletionError
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct CompletionError {
+	pub message: String,
+	pub r#type: String,
+	pub param: Option<String>,
+	pub code: String
+}
+
 #[derive(Serialize)]
 pub struct CompletionRequest {
     pub model: String,
 	pub messages: Vec<Message>
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct CompletionResponse {
 	pub id: String,
 	pub object: String,
@@ -38,33 +57,29 @@ impl CompletionResponse {
 	pub fn msg(&self) -> String {
 		return self.choices[0].message.content.clone();
 	}
-
-	pub fn error(&self) -> bool {
-		return self.id == "Request error"
-	}
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct TokenUsage {
 	pub prompt_tokens: u64,
 	pub completion_tokens: u64,
 	pub total_tokens: u64
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct ResponseChoice {
 	pub index: u64,
 	pub finish_reason: String,
     pub message: Message
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Message {
 	pub role: MessageRole,
 	pub content: String
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub enum MessageRole {
 	#[serde(rename = "assistant")]
 	Assistant,
