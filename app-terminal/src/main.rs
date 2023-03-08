@@ -1,12 +1,11 @@
 use clap::Parser;
 use serde_json::json;
+use openai::prelude::*;
 use std::{io::Write, path::PathBuf};
 use spinners::{Spinner, Spinners};
 
 mod error;
 use error::MainError;
-mod openai;
-use openai::prelude::*;
 
 #[derive(Debug, Parser)]
 #[command(name = "ChatGPT Player")]

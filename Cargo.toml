@@ -1,20 +1,6 @@
-[package]
-name = "ai"
-version = "0.1.0"
-edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-reqwest = { version = "0.11.14", features = ["json", "socks"] }
-serde = { version = "1.0.152", features = ["derive"] }
-serde_json = "1.0.93"
-tokio = { version = "1.25.0", features = ["full"] }
-# chatgpt_rs = "0.6.0"
-spinners = "4.1.0"
-# crossterm = "^0.22.0"
-# url = "2.3.1"
-clap = { version = "4.1.4", features = ["derive"] }
-serde_variant = "0.1.2"
-rusqlite = "0.28.0"
-chrono = "0.4.23"
+[workspace]
+members = [
+	"app-terminal",
+	"openai"
+]
+default-members = ["app-terminal"]
