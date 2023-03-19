@@ -1,7 +1,7 @@
 use reqwest::{self, Proxy};
 
-use super::error::*;
-use super::types::*;
+use crate::error::*;
+use crate::types::*;
 
 pub async fn get_response(
     context: &Vec<Message>,

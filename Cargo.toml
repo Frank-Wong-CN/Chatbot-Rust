@@ -1,6 +1,6 @@
 [workspace]
 members = [
 	"app-terminal",
+	"database",
 	"openai"
 ]
-default-members = ["app-terminal"]

@@ -1,5 +1,5 @@
-use openai::types::SavedMessage;
 use rusqlite::Connection;
+use openai::types::SavedMessage;
 
 pub struct ChatManager {
 	pub max_token: u64,

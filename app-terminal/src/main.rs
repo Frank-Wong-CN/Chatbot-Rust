@@ -1,8 +1,10 @@
+use std::{io::Write, path::PathBuf};
 use clap::Parser;
 use serde_json::json;
-use openai::prelude::*;
-use std::{io::Write, path::PathBuf};
 use spinners::{Spinner, Spinners};
+
+use openai::prelude::*;
+use database::*;
 
 mod error;
 use error::*;
@@ -42,7 +44,7 @@ struct CommandLineParser {
 	proxy: Option<String>,
 }
 
-fn init() -> Result<ChatManager, ArgumentError> {
+fn init() -> Result<ChatManager, MainError> {
 	let args = CommandLineParser::parse();
 	let exe_dir = std::env::current_exe().unwrap().parent().unwrap().to_path_buf();
 	let cw_dir = std::env::current_dir().unwrap().to_path_buf();
@@ -70,7 +72,7 @@ fn init() -> Result<ChatManager, ArgumentError> {
 
     if api_key.is_empty() {
 		let error = ArgumentError::new("api_key", "No API Key!");
-        return Err(error);
+        return Err(MainError::ArgumentError(error));
     }
 
 	let mut db_dir: PathBuf;
@@ -84,6 +86,8 @@ fn init() -> Result<ChatManager, ArgumentError> {
 	}
 
 	let conn = open_connection(&db_dir);
+	Database::init_current_schema(&conn)?;
+
 	let max_dialog = args.max_dialog;
 	let max_token = args.max_token;
 	let proxy = args.proxy;
@@ -102,9 +106,8 @@ fn create_session(mgr: &ChatManager) -> Result<ChatSession, MainError> {
 	let conversation_id: u32;
 	let mut all_conv_id: Vec<u32> = vec![];
 	let mut all_messages: Vec<SavedMessage> = vec![];
-	init_schemas(&mgr.connection)?;
 
-	let all_conversations = get_all_conversations(&mgr.connection, &mgr.api_key)?;
+	let all_conversations = Database::get_all_conversations(&mgr.connection, &mgr.api_key)?;
 	println!("You have {} conversation(s) currently saved.", all_conversations.len());
 	for conv in all_conversations.iter() {
 		all_conv_id.push(conv.id);
@@ -129,10 +132,10 @@ fn create_session(mgr: &ChatManager) -> Result<ChatSession, MainError> {
 				continue
 			}
 			conversation_id = number;
-			all_messages = get_all_messages_in_conversation(&mgr.connection, conversation_id)?;
+			all_messages = Database::get_all_messages_in_conversation(&mgr.connection, conversation_id)?;
 		}
 		else {
-			conversation_id = add_conversation(&mgr.connection, &prompt, &mgr.api_key)?;
+			conversation_id = Database::add_conversation(&mgr.connection, &prompt, &mgr.api_key)?;
 		}
 
 		for msg in all_messages.iter() {
@@ -162,11 +165,11 @@ async fn execute_chat(mgr: &mut ChatManager) -> Result<(), MainError> {
 	let mut i = 0;
 	let mut j = 0;
 	'context_filler: for msg in session.history.iter().rev() {
+		i += 1;
+		j += msg.content.len() as u64 / 2;
 		if i > mgr.max_dialog || j > mgr.max_token {
 			break 'context_filler;
 		}
-		i += 1;
-		j += msg.content.len() as u64 / 3;
 		let role_str = &msg.role[..];
 		context.insert(0, Message {
 			role: match role_str {
@@ -185,22 +188,22 @@ async fn execute_chat(mgr: &mut ChatManager) -> Result<(), MainError> {
 	match openai_response {
 		Ok(response) => match response {
 			OpenAIResponse::Success(completion_response) => {
-				add_client_message(&mgr.connection, session.conversation_id, &session.prompt)?;
-				add_server_message(&mgr.connection, session.conversation_id, &completion_response)?;
-				session.history = get_all_messages_in_conversation(&mgr.connection, session.conversation_id)?;
+				Database::add_client_message(&mgr.connection, session.conversation_id, &session.prompt)?;
+				Database::add_server_message(&mgr.connection, session.conversation_id, &completion_response)?;
+				session.history = Database::get_all_messages_in_conversation(&mgr.connection, session.conversation_id)?;
 				spinner.stop_with_message(SEPARATOR.into());
 
 				println!("ChatGPT: {}", completion_response.msg().trim());
 			},
 			OpenAIResponse::Failure(openai_error) => {
-				add_error_log(&mgr.connection, &mgr.api_key, &context, &json!(openai_error).to_string(), Some(&openai_error))?;
+				Database::add_error_log(&mgr.connection, &mgr.api_key, &context, &json!(openai_error).to_string(), Some(&openai_error))?;
 				spinner.stop_with_message(SEPARATOR.into());
 
 				println!("Error: {}", openai_error.error.message);
 			}
 		},
 		Err(err) => {
-			add_error_log(&mgr.connection, &mgr.api_key, &context, &err, None)?;
+			Database::add_error_log(&mgr.connection, &mgr.api_key, &context, &err, None)?;
 			spinner.stop_with_message(SEPARATOR.into());
 
 			println!("Error: {}", err);
@@ -215,14 +218,15 @@ async fn main() -> Result<(), MainError> {
 	let mut mgr: ChatManager;
 	match init() {
 		Ok(manager) => mgr = manager,
-		Err(error) => match error.argument.as_str() {
-			"api_key" => {
-				println!("Please provide an API Key. See -h for more details.");
-				std::process::exit(1);
+		Err(error) => match error {
+			MainError::ArgumentError(error_argument) => match error_argument.argument.as_str() {
+				"api_key" => {
+					println!("Please provide an API Key. See -h for more details.");
+					std::process::exit(1);
+				},
+				_ => panic!("{}", error_argument)
 			},
-			_ => {
-				panic!("{}", error);
-			}
+			_ => panic!("{}", error)
 		}
 	};
 	
