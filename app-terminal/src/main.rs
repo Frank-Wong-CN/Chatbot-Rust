@@ -42,6 +42,10 @@ struct CommandLineParser {
 	// Proxy
 	#[arg(short, long, value_name = "Proxy Address, for example: \"socks5://127.0.0.1:1080\"")]
 	proxy: Option<String>,
+
+	// Model
+	#[arg(short, long, value_name = "Model, such as \"gpt-3.5-turbo\" and \"gpt-4\"", default_value = "gpt-4")]
+	model: String,
 }
 
 fn init() -> Result<ChatManager, MainError> {
@@ -91,12 +95,14 @@ fn init() -> Result<ChatManager, MainError> {
 	let max_dialog = args.max_dialog;
 	let max_token = args.max_token;
 	let proxy = args.proxy;
+	let model = args.model;
 
 	Ok(ChatManager {
 		max_token,
 		max_dialog,
 		api_key,
 		proxy,
+		model,
 		connection: conn,
 		current_session: None
 	})
@@ -184,7 +190,7 @@ async fn execute_chat(mgr: &mut ChatManager) -> Result<(), MainError> {
 
 	context.push(Message { role: MessageRole::User, content: session.prompt.clone() });
 
-	let openai_response = get_response(&context, &mgr.api_key, &mgr.proxy).await;
+	let openai_response = get_response(&context, &mgr.api_key, &mgr.proxy, &mgr.model).await;
 	match openai_response {
 		Ok(response) => match response {
 			OpenAIResponse::Success(completion_response) => {

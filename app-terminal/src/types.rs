@@ -7,6 +7,7 @@ pub struct ChatManager {
 	pub api_key: String,
 	pub connection: Connection,
 	pub proxy: Option<String>,
+	pub model: String,
 	pub current_session: Option<ChatSession>
 }
 

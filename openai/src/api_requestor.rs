@@ -6,7 +6,8 @@ use crate::types::*;
 pub async fn get_response(
     context: &Vec<Message>,
     api_key: &str,
-	use_proxy: &Option<String>
+	use_proxy: &Option<String>,
+	model: &str
 ) -> Result<OpenAIResponse, String> {
     let client = if let Some(proxy) = use_proxy {
 		reqwest::Client::builder().proxy(Proxy::all(proxy).unwrap()).build().unwrap()
@@ -17,7 +18,7 @@ pub async fn get_response(
     let url = "https://api.openai.com/v1/chat/completions";
 
     let request = CompletionRequest {
-        model: "gpt-3.5-turbo".into(),
+        model: model.into(),
         messages: context.clone().to_vec(),
     };
 
